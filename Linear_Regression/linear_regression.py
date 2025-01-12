@@ -18,10 +18,10 @@ def mean_square_error(w, X, y):
     - err: the mean square error
     """
     #####################################################
-    # TODO 1: Fill in your code here                    #
+    # 1: Fill in your code here                         #
     #####################################################
-    err = None
-    return err
+    mse = (X.dot(w) - y) ** 2 #square error
+    return sum(mse)/len(y) #means it
 
 ###### Part 1.2 ######
 def linear_regression_noreg(X, y):
@@ -34,9 +34,10 @@ def linear_regression_noreg(X, y):
   - w: a numpy array of shape (D, )
   """
   #####################################################
-  #	TODO 2: Fill in your code here                    #
+  #	2: Fill in your code here                         #
   #####################################################		
-  w = None
+  test = np.dot(np.linalg.inv(np.dot(X.transpose(), X)), X.transpose())
+  w = np.dot(test, y)
   return w
 
 
@@ -52,9 +53,10 @@ def regularized_linear_regression(X, y, lambd):
     - w: a numpy array of shape (D, )
     """
   #####################################################
-  # TODO 4: Fill in your code here                    #
+  # 4: Fill in your code here                         #
   #####################################################		
-    w = None
+    test = np.dot(np.linalg.inv(np.dot(X.transpose(), X) + (lambd * np.identity(X.shape[1]))), X.transpose())
+    w = np.dot(test, y)
     return w
 
 ###### Part 1.4 ######
@@ -70,9 +72,25 @@ def tune_lambda(Xtrain, ytrain, Xval, yval):
     - bestlambda: the best lambda you find among 2^{-14}, 2^{-13}, ..., 2^{-1}, 1.
     """
     #####################################################
-    # TODO 5: Fill in your code here                    #
+    # 5: Fill in your code here                         #
     #####################################################		
+    tuners = [2**(-1*i) for i in range(15)] #list comprehension of tunner values
+    tuners = tuners[::-1] #reverse the list
+    firstIt = True
     bestlambda = None
+    minMSE = None
+    for lambd in tuners:
+        model_ith = regularized_linear_regression(Xtrain, ytrain, lambd)
+        mse_ith = mean_square_error(model_ith, Xval, yval)
+        if firstIt == True:
+            minMSE = mse_ith
+            firstIt = False
+            bestlambda = lambd
+        else:
+            if mse_ith <= minMSE:
+                minMSE = mse_ith
+                bestlambda = lambd
+
     return bestlambda
     
 
@@ -87,10 +105,15 @@ def mapping_data(X, p):
     - X: The augmented dataset. You might find np.insert useful.
     """
     #####################################################
-    # TODO 6: Fill in your code here                    #
+    #  6: Fill in your code here                        #
     #####################################################		
     
-    return X
+    res = X
+    for i in range(2,p+1):
+        newX = X ** i
+        for j in range(X.shape[1]):
+            res = np.insert(res, res.shape[1], newX[:,j], axis=1)
+    return res #np.array(newX)
 
 """
 NO MODIFICATIONS below this line.
