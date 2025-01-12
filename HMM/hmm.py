@@ -35,8 +35,15 @@ class HMM:
         ######################################################
         # TODO: compute and return the forward messages alpha
         ######################################################
+        #base-case
+        alpha[:, 0] = self.pi*self.B[:, O[0]]
 
-
+        #the rest -- dynamic programming
+        # O provides the index of observation symbol
+        for t in range(1, L):
+            for s in range(S):
+                alpha[s][t] = self.B[s][O[t]] * np.dot(self.A[:, s], alpha[:, t-1])
+        return alpha
         
 
     def backward(self, Osequence):
@@ -55,7 +62,15 @@ class HMM:
         #######################################################
         # TODO: compute and return the backward messages beta
         #######################################################
+        #base-case
+        beta[:, L-1] = np.ones(S)
 
+        #the rest... dynamic programming
+        for t in range(L-2, -1, -1):
+            for s in range(S):
+                beta[s][t] = np.dot((beta[:, t+1] * self.B[:, O[t+1]]), self.A[s, :] )
+
+        return beta
 
     def sequence_prob(self, Osequence):
         """
@@ -70,7 +85,9 @@ class HMM:
         # TODO: compute and return prob = P(X_{1:T}=x_{1:T})
         #   using the forward/backward messages
         #####################################################
-
+        forward_message = self.forward(Osequence)
+        seq_probs = forward_message[:, -1] #we just want at time T for all states
+        return np.sum(seq_probs)
 
     def posterior_prob(self, Osequence):
         """
@@ -84,7 +101,11 @@ class HMM:
         ######################################################################
         # TODO: compute and return gamma using the forward/backward messages
         ######################################################################
-
+        alpha = self.forward(Osequence)
+        beta = self.backward(Osequence)
+        normalize = self.sequence_prob(Osequence)
+        gamma = alpha * beta / normalize
+        return gamma
 
     
     def likelihood_prob(self, Osequence):
@@ -102,7 +123,21 @@ class HMM:
         #####################################################################
         # TODO: compute and return prob using the forward/backward messages
         #####################################################################
-
+        S = len(self.pi)
+        L = len(Osequence)
+        prob = np.zeros([S, S, L - 1])
+        #####################################################################
+        # TODO: compute and return prob using the forward/backward messages
+        #####################################################################
+        alpha = self.forward(Osequence)
+        beta = self.backward(Osequence)
+        normalize = self.sequence_prob(Osequence)
+        O = self.find_item(Osequence)
+        for t in range(L-1):
+            for i in range(S):
+                for j in range(S):
+                    prob[i][j][t] = alpha[i][t] * self.A[i][j] * beta[j][t+1] *self.B[j] [O[t+1]] /normalize
+        return prob
 
     def viterbi(self, Osequence):
         """
@@ -117,7 +152,34 @@ class HMM:
         ################################################################################
         # TODO: implement the Viterbi algorithm and return the most likely state path
         ################################################################################
-        
+        S = len(self.pi)
+        L = len(Osequence)
+        O = self.find_item(Osequence)  # gets the index
+        delta = np.zeros((S,L)) #calculate most likely paths
+        choice = np.zeros((S,L), dtype=int)
+        backwards = np.zeros(L, dtype=int)
+        tracker = 0
+        #base-case:
+        delta[:,0] = self.pi * self.B[:, O[0]]
+        #main algo
+        for t in range(1,L):
+            for s in range(S):
+                margin = self.A[:,s] * delta[:, t-1]
+                delta[s][t] = self.B[s][O[t]] * np.max(margin)
+                choice[s][t] = np.argmax(margin)
+        #back-track
+        end = delta[:,L-1]
+        s_t = np.argmax(end)
+        backwards[tracker]= s_t
+        tracker += 1
+        for t in range(L-1, 0, -1):
+            s_t = choice[s_t][t]
+            backwards[tracker] = s_t
+            tracker += 1
+        backwards = np.flip(backwards)
+        for idx in backwards:
+            path.append(self.find_key(self.state_dict, idx))
+
         return path
 
 
