@@ -20,7 +20,27 @@ def get_k_means_plus_plus_center_indices(n, n_cluster, x, generator=np.random):
     ###############################################
     # TODO: implement the Kmeans++ initialization
     ###############################################
-    
+    centers = []
+    mu1 = generator.randint(0, n) #grab random index
+    centers.append(mu1) #start with random data points as the first center
+
+    #implement it in the most natural way, return the smallest index n so that the cumulative prob from example 1 to n
+    #is larger than r
+    for muKth in range(1, n_cluster): #the rest of the clusters
+        muRand = generator.rand() #gets random float
+        min_dist_sq = []
+        for xi in x:
+            dist_sq = []
+            for mu in centers: #find my nearest centroid
+                dist_sq.append(np.linalg.norm(x[mu] - xi) ** 2)
+            min_dist_sq.append(min(dist_sq))
+        min_dist_norm = min_dist_sq/sum(min_dist_sq)
+        #centers.append(np.argmax(min_dist_norm))
+        cumulative = np.cumsum(min_dist_norm)
+        for ind in range(len(cumulative)):
+            if muRand < cumulative[ind]:
+                centers.append(ind)
+                break
 
     # DO NOT CHANGE CODE BELOW THIS LINE
     return centers
@@ -69,7 +89,31 @@ class KMeans():
         #   (i.e., average K-mean objective changes less than self.e)
         #   or until you have made self.max_iter updates.
         ###################################################################
+        final_centroids = np.zeros((self.n_cluster, D))
+        for i in range(self.n_cluster):
+            final_centroids[i] = x[self.centers[i]]
+        labels = np.zeros(N)
+        update_num = 0
+        prev_avg = None
+        for num_iter in range(self.max_iter):
+            #label each point
+            distances = np.sum(((x - np.expand_dims(final_centroids, axis=1)) **2), axis=2)
+            labels = np.argmin(distances, axis=0)
+            if prev_avg is None:
+                prev_avg = np.sum([np.sum((x[labels ==  i] - final_centroids[i]) ** 2) for i in range(self.n_cluster)])/N
+            else:
+                checker = np.sum([np.sum((x[labels ==  i] - final_centroids[i]) ** 2) for i in range(self.n_cluster)])/N
+                if np.absolute(checker - prev_avg) <= self.e:  # we have converged
+                    break
+                prev_avg = checker  # update previous average
+            #update the centroids or final_centroids[muth] = np.array(np.mean(x[labels == muth], axis=0))
+            for muth in range(self.n_cluster):
+                myLabels = np.where(labels == muth)
+                myVals = np.array([num for num in x[myLabels]])
+                final_centroids[muth]= np.sum(myVals, axis=0)/myVals.shape[0] #calculate the new avg
+            update_num += 1
 
+        return final_centroids, labels, update_num
         
 
 
@@ -116,7 +160,15 @@ class KMeansClassifier():
         #      and "fit" with the given "centroid_func" function)
         # - assign labels to centroid_labels
         ################################################################
-
+        #class instantiation
+        k_means = KMeans(n_cluster=self.n_cluster, max_iter=self.max_iter, e=self.e)
+        centroids, labels, update_num = k_means.fit(x)
+        centroid_labels = []
+        for muth in range(self.n_cluster): # go over all centroids
+            myPoints = np.where(labels == muth) #select only my members
+            myLabels = np.array([y_i for y_i in y[myPoints]]) #get the labels of your members
+            centroid_labels.append(np.argmax(np.bincount(myLabels))) #you're labeled most frequent
+        centroid_labels = np.array(centroid_labels)
         
         # DO NOT CHANGE CODE BELOW THIS LINE
         self.centroid_labels = centroid_labels
@@ -146,7 +198,15 @@ class KMeansClassifier():
         # - for each example in x, predict its label using 1-NN on the stored 
         #    dataset (self.centroids, self.centroid_labels)
         ##########################################################################
-        
+        predicted_idx = []
+        for xith in x:
+            dist = []
+            for mu in self.centroids:
+                dist.append(np.linalg.norm(xith - mu) ** 2)
+            predicted_idx.append(np.argmin(dist))
+        predicted_labels = self.centroid_labels[predicted_idx]
+        predicted_labels = np.array(predicted_labels)
+        return np.array(predicted_labels)
 
 
 
@@ -171,4 +231,19 @@ def transform_image(image, code_vectors):
     # TODO
     # - replace each pixel (a 3-dimensional point) by its nearest code vector
     ##############################################################################
-    
+    rows = image.shape[0]
+    cols = image.shape[1]
+    #reshape to pixel array with dimension 3
+    pixel = image.reshape(rows * cols, 3)
+    #replace each pixel by its nearest code vector
+    new_pixel = []
+    for pi in pixel:
+        dist = []
+        for ci in code_vectors:
+            dist.append(np.linalg.norm(pi - ci) ** 2)
+        new_pixel.append(np.argmin(dist))
+    compressed_image = code_vectors[new_pixel]
+    compressed_image = np.array(compressed_image)
+    # transform data back into image shape
+    compressed_image = compressed_image.reshape(rows, cols, 3)
+    return compressed_image
