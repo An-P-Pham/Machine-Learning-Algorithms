@@ -38,13 +38,34 @@ def binary_train(X, y, loss="perceptron", w0=None, b0=None, step_size=0.5, max_i
     if b0 is not None:
         b = b0
 
+    #we must include the bias term
+    #axis = 0 is the row
+    #axis = 1 is the column
+    N, D = X.shape  # updated shape
+    transLabels = np.ones(X.shape[0])
+    for ind in range(len(y)):
+        if y[ind] == 0:
+            transLabels[ind] = -1
+    X = np.insert(X, 0, 1, axis=1) #bias will be in the beginning
+    w = np.insert(w, 0, b)
+
     if loss == "perceptron":
         ################################################
         # TODO 1 : perform "max_iterations" steps of   #
         # gradient descent with step size "step_size"  #
         # to minimize perceptron loss                  # 
         ################################################
-
+        for i in range(max_iterations):
+            ithPred = np.dot(X,w)
+            ithPred = transLabels * ithPred
+            for j, arr in enumerate(ithPred): #go through each prediction & transform back
+                if arr <= 0:
+                    ithPred[j] = 1
+                else:
+                    ithPred[j] = 0
+            ithPred = ithPred * transLabels
+            learn = np.dot(np.transpose(ithPred), X)
+            w += learn * (step_size/N)  #average GD
         
         
 
@@ -54,12 +75,20 @@ def binary_train(X, y, loss="perceptron", w0=None, b0=None, step_size=0.5, max_i
         # gradient descent with step size "step_size"  #
         # to minimize logistic loss                    # 
         ################################################
-
+        for i in range(max_iterations):
+            ithPred = np.dot(X, w) #gives up prediction labels
+            ithPred = transLabels * ithPred
+            ithPred = sigmoid(-1 * ithPred) * transLabels
+            learn = np.dot(np.transpose(ithPred), X)
+            w += learn * (step_size/N)
         
 
     else:
         raise "Undefined loss function."
 
+    b = w[0] #assign the bias term
+    X = np.delete(X, 0, axis=1)
+    w = np.delete(w, 0) #remove the constant weight for bias before returning
     assert w.shape == (D,)
     return w, b
 
@@ -77,7 +106,7 @@ def sigmoid(z):
     ############################################
     # TODO 3 : fill in the sigmoid function    #
     ############################################
-    
+    value = 1/(1+np.exp(-z))
     return value
 
 
@@ -98,7 +127,14 @@ def binary_predict(X, w, b):
     #############################################################
     # TODO 4 : predict DETERMINISTICALLY (i.e. do not randomize)#
     #############################################################
-  
+    #include the bias
+    X = np.insert(X, 0, 1, axis=1)  # bias will be in the beginning
+    w = np.insert(w, 0, b)
+    res = np.dot(X, w)
+    preds = np.zeros(N) #populate the labels
+    for i, pred in enumerate(res):
+        if pred > 0:
+            preds[i] = 1 #correct the labels
 
     assert preds.shape == (N,) 
     return preds
@@ -146,19 +182,43 @@ def multiclass_train(X, y, C,
     b = np.zeros(C)
     if b0 is not None:
         b = b0
+    
+    # we must include the bias term
+    # axis = 0 is the row
+    # axis = 1 is the column
+    X = np.insert(X, 0, 1, axis=1)  # bias will be in the beginning
+    w = np.insert(w, 0, b, axis=1) #add each class's respective bias
+
+    one_hot = None
+
+    if one_hot is None:
+        if gd_type == "sgd":
+            one_hot = np.zeros((1, C))
+        elif gd_type == "gd":
+            one_hot = np.zeros((N, C))
+        else:
+            raise "Undefined algorithm."
 
     np.random.seed(42) #DO NOT CHANGE THE RANDOM SEED IN YOUR FINAL SUBMISSION
     if gd_type == "sgd":
-
-        for it in range(max_iterations):
-            n = np.random.choice(N)
             ####################################################
             # TODO 5 : perform "max_iterations" steps of       #
             # stochastic gradient descent with step size       #
             # "step_size" to minimize logistic loss. We already#
             # pick the index of the random sample for you (n)  #
             ####################################################			
-        
+        for i in range(max_iterations):
+            randIdx = np.random.randint(N)
+            xith = X[randIdx]
+            ithPred = np.dot(xith, np.transpose(w)) #produces Cx1 at the end
+            ithPred -= np.max(ithPred)
+            ithPred = np.exp(ithPred)
+            ithPred = ithPred/np.sum(ithPred)
+            ithPred[y[randIdx]] -= 1
+            ithPred = np.reshape(ithPred, (w.shape[0], 1))
+            xith = np.reshape(xith, (1, X.shape[1]))
+            learn = np.dot(ithPred, xith)
+            w += learn * (-1*step_size)
         
 
     elif gd_type == "gd":
@@ -167,13 +227,23 @@ def multiclass_train(X, y, C,
         # gradient descent with step size "step_size"      #
         # to minimize logistic loss.                       #
         ####################################################
-        
-        
+        for i, arr in enumerate(y):
+            one_hot[i][arr] = 1
+        for i in range(max_iterations):
+            ithPred = np.dot(X, np.transpose(w))
+            ithPred -= np.amax(ithPred)
+            ithPred = np.exp(ithPred)
+            ithPred = ithPred/np.sum(ithPred, axis=1, keepdims=True)
+            softmax = ithPred - one_hot
+            learn = np.dot(np.transpose(softmax), X)
+            w += learn * (-1* step_size / N)
 
     else:
         raise "Undefined algorithm."
     
-
+    b = w[:, 0]
+    X = np.delete(X, 0, axis=1)
+    w = np.delete(w, 0, axis=1)
     assert w.shape == (C, D)
     assert b.shape == (C,)
 
@@ -197,9 +267,16 @@ def multiclass_predict(X, w, b):
     #############################################################
     # TODO 7 : predict DETERMINISTICALLY (i.e. do not randomize)#
     #############################################################
-
-    
+    X = np.insert(X, 0, 1, axis=1)  # bias will be in the beginning
+    w = np.insert(w, 0, b, axis=1)  # add each class's respective bias
+    calc = np.dot(X, np.transpose(w))
+    preds = []
+    for i in range(N):
+        preds.append(np.argmax(calc[i]))
+    preds = np.array(preds)
     assert preds.shape == (N,)
+    X = np.delete(X, 0, axis=1)
+    w = np.delete(w, 0, axis=1)
     return preds
 
 
