@@ -15,12 +15,30 @@ def f1_score(real_labels, predicted_labels):
     :return: float
     """
     assert len(real_labels) == len(predicted_labels)
-    raise NotImplementedError
+    #positive = 1, negitive = 0
+    #TP = 1,1
+    #TN = 0,0
+    #FP = 0,1
+    #FN = 1,0
+    TP, TN, FP, FN = 0, 0, 0, 0
+    for i in range(len(real_labels)):
+        if real_labels[i] == 1 and predicted_labels[i] ==1:
+            TP += 1
+        elif real_labels[i] == 0 and predicted_labels[i] ==0:
+            TN += 1
+        elif real_labels[i] == 0 and predicted_labels[i] ==1:
+            FP += 1
+        elif real_labels[i] == 1 and predicted_labels[i] ==0:
+            FN += 1
+    if TP == 0:
+        return 0.0
+    precision = TP/(TP+FP)
+    recall = TP/(TP+FN)
+    return (2*(precision* recall))/(precision+recall)
 
 
 class Distances:
     @staticmethod
-    # TODO
     def minkowski_distance(point1, point2):
         """
         Minkowski distance is the generalized version of Euclidean Distance
@@ -31,27 +49,38 @@ class Distances:
         :param point2: List[float]
         :return: float
         """
-        raise NotImplementedError
+        v = np.subtract(point1, point2)
+        v = np.absolute(v)
+        v = np.power(v, 3)
+        tot = sum(v)
+        return tot ** (1. / 3)
 
     @staticmethod
-    # TODO
     def euclidean_distance(point1, point2):
         """
         :param point1: List[float]
         :param point2: List[float]
         :return: float
         """
-        raise NotImplementedError
+        v = np.subtract(point1, point2)
+        v = np.square(v)
+        return np.sum(v) ** 0.5
 
     @staticmethod
-    # TODO
     def cosine_similarity_distance(point1, point2):
         """
        :param point1: List[float]
        :param point2: List[float]
        :return: float
        """
-        raise NotImplementedError
+        v1 = np.square(point1)
+        norm1 = sum(v1) ** 0.5
+        v2 = np.square(point2)
+        norm2 = sum(v2) ** 0.5
+        if norm1 == 0 or norm2 == 0:
+            return 1
+        else:
+            return (1 - np.dot(point1, point2)/(norm1*norm2))
 
 
 
@@ -62,7 +91,7 @@ class HyperparameterTuner:
         self.best_scaler = None
         self.best_model = None
 
-    # TODO: find parameters with the best f1 score on validation dataset
+    # find parameters with the best f1 score on validation dataset
     def tuning_without_scaling(self, distance_funcs, x_train, y_train, x_val, y_val):
         """
         In this part, you need to try different distance functions you implemented in part 1.1 and different values of k (among 1, 3, 5, ... , 29), and find the best model with the highest f1-score on the given validation set.
@@ -84,12 +113,22 @@ class HyperparameterTuner:
         """
         
         # You need to assign the final values to these variables
-        self.best_k = None
-        self.best_distance_function = None
-        self.best_model = None
-        raise NotImplementedError
+        #loop distant fun
+        #loop ks 1-29
+        best = 0.0
+        for key, value in distance_funcs.items():
+            for k in range(1, 30, 2):
+                model = KNN(k, value)
+                model.train(x_train, y_train)
+                y_predict = model.predict(x_val)
+                score = f1_score(y_val, y_predict)
+                if score > best:
+                    best = score #update the current best
+                    self.best_k = k
+                    self.best_distance_function = key
+                    self.best_model = model
 
-    # TODO: find parameters with the best f1 score on validation dataset, with normalized data
+    # find parameters with the best f1 score on validation dataset, with normalized data
     def tuning_with_scaling(self, distance_funcs, scaling_classes, x_train, y_train, x_val, y_val):
         """
         This part is the same as "tuning_without_scaling", except that you also need to try two different scalers implemented in Part 1.3. More specifically, before passing the training and validation data to KNN model, apply the scalers in scaling_classes to both of them. 
@@ -108,18 +147,30 @@ class HyperparameterTuner:
         """
         
         # You need to assign the final values to these variables
-        self.best_k = None
-        self.best_distance_function = None
-        self.best_scaler = None
-        self.best_model = None
-        raise NotImplementedError
+        best = 0.0
+        for key, value in distance_funcs.items():
+            for key2, value2 in scaling_classes.items():
+                for k in range(1, 30, 2):
+                    model = KNN(k, value)
+                    scal_func = value2()
+                    train_scale = scal_func(x_train) #scale the training data
+                    val_scale = scal_func(x_val) #scale the validation data
+                    model.train(train_scale, y_train)
+                    y_predict = model.predict(val_scale)
+                    score = f1_score(y_val, y_predict)
+                    if score > best:
+                        best = score  # update the current best
+                        self.best_k = k
+                        self.best_distance_function = key
+                        self.best_model = model
+                        self.best_scaler = key2
 
 
 class NormalizationScaler:
     def __init__(self):
         pass
 
-    # TODO: normalize data
+    # normalize data
     def __call__(self, features):
         """
         Normalize features for every sample
@@ -131,14 +182,22 @@ class NormalizationScaler:
         :param features: List[List[float]]
         :return: List[List[float]]
         """
-        raise NotImplementedError
+        results = []
+        for xi in features:
+            temp = np.square(xi)
+            norm = sum(temp) ** 0.5
+            if norm == 0:
+                results.append(xi) #just add the 0 vector
+            else:
+                results.append(np.true_divide(xi, norm))
+        return results
 
 
 class MinMaxScaler:
     def __init__(self):
         pass
 
-    # TODO: min-max normalize data
+    # min-max normalize data
     def __call__(self, features):
         """
 		For each feature, normalize it linearly so that its value is between 0 and 1 across all samples.
@@ -154,4 +213,17 @@ class MinMaxScaler:
         :param features: List[List[float]]
         :return: List[List[float]]
         """
-        raise NotImplementedError
+        mat = np.array(features)
+        result = []
+        for li in features:
+            temp = []
+            for i in range(mat.shape[1]):
+                arr = mat[:, i]
+                mini = min(arr)
+                maxi = max(arr)
+                if mini == maxi:
+                    temp.append(0.0)
+                else:
+                    temp.append((li[i] - mini) / float(maxi - mini))
+            result.append(temp)
+        return result

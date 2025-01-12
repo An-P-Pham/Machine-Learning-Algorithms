@@ -13,8 +13,10 @@ class KNN:
         """
         self.k = k
         self.distance_function = distance_function
+        self.features = []
+        self.labels = []
 
-    # TODO: save features and lable to self
+    # save features and lable to self
     def train(self, features, labels):
         """
         In this function, features is simply training data which is a 2D list with float values.
@@ -27,9 +29,10 @@ class KNN:
         :param features: List[List[float]]
         :param labels: List[int]
         """
-        raise NotImplementedError
+        self.features = features
+        self.labels = labels
 
-    # TODO: find KNN of one point
+    # find KNN of one point
     def get_k_neighbors(self, point):
         """
         This function takes one single data point and finds k-nearest neighbours in the training set.
@@ -38,9 +41,24 @@ class KNN:
         :param point: List[float]
         :return:  List[int]
         """
-        raise NotImplementedError
+        dist = []
+        knn = []
+        for Li in self.features: # get distance for all feature vectors
+            dist.append(self.distance_function(Li, point))
+        
+        # sort --> so we can find k nearest
+        if self.k > len(dist):
+            self.k = len(dist)
+        distPair = []
+        for i in range(len(dist)):
+            distPair.append((self.labels[i], dist[i]))
+        distPair = np.array(distPair)
+        distPair = distPair[np.argsort(distPair[:,1])] #get the indicies of sorted
+        for i in range(self.k):
+            knn.append(distPair[i][0])
+        return knn
 		
-	# TODO: predict labels of a list of points
+	# predict labels of a list of points
     def predict(self, features):
         """
         This function takes 2D list of test data points, similar to those from train function. Here, you need to process
@@ -51,7 +69,11 @@ class KNN:
         :param features: List[List[float]]
         :return: List[int]
         """
-        raise NotImplementedError	
+        result = []
+        for xi in features:
+            neighbors = self.get_k_neighbors(xi)
+            result.append(max(set(neighbors), key=neighbors.count))
+        return result	
 
 
 if __name__ == '__main__':
